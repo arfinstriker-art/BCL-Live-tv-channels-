@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PulseTV Live</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+font-family:Inter,sans-serif;
+background:#050816;
+color:white;
+overflow-x:hidden;
+}
+.app{padding-bottom:80px}
+.hero{
+padding:25px 20px;
+background:
+radial-gradient(circle at top left, rgba(124,58,237,.3), transparent 30%),
+radial-gradient(circle at top right, rgba(6,182,212,.2), transparent 30%);
+}
+.brand{display:flex;align-items:center;gap:14px}
+.logo{
+width:58px;height:58px;border-radius:18px;
+background:linear-gradient(135deg,#7c3aed,#06b6d4);
+display:flex;align-items:center;justify-content:center;
+font-size:24px;font-weight:800;
+}
+.brand h1{font-size:32px;font-weight:800}
+.brand p{margin-top:4px;color:#94a3b8}
+.search-wrap{margin-top:24px;position:relative}
+.search{
+width:100%;height:62px;border:none;outline:none;
+border-radius:22px;padding:0 20px 0 54px;
+background:rgba(255,255,255,.07);
+color:white;font-size:16px;
+}
+.search-icon{
+position:absolute;left:20px;top:50%;
+transform:translateY(-50%);opacity:.7;
+}
+.filters{padding:18px 20px}
+.filter-row{
+display:flex;gap:10px;overflow:auto;padding-bottom:10px;
+}
+.chip{
+border:none;background:rgba(255,255,255,.08);
+color:white;padding:12px 18px;border-radius:999px;
+cursor:pointer;white-space:nowrap;
+}
+.chip.active{
+background:linear-gradient(135deg,#7c3aed,#5b21b6);
+}
+.section{padding:10px 20px}
+.section h2{font-size:28px;margin-bottom:8px}
+.results{color:#94a3b8;margin-bottom:24px}
+.grid{
+display:grid;
+grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+gap:20px;
+}
+.card{
+background:rgba(255,255,255,.05);
+border:1px solid rgba(255,255,255,.08);
+border-radius:28px;padding:20px;
+transition:.35s;cursor:pointer;
+}
+.card:hover{transform:translateY(-6px)}
+.live{
+display:inline-flex;align-items:center;gap:8px;
+padding:8px 12px;border-radius:999px;
+background:rgba(255,0,70,.15);
+color:#ff4f7a;font-size:12px;font-weight:700;
+}
+.dot{
+width:10px;height:10px;border-radius:50%;
+background:#ff375f;animation:pulse 1.5s infinite;
+}
+@keyframes pulse{
+0%{box-shadow:0 0 0 0 rgba(255,55,95,.7)}
+70%{box-shadow:0 0 0 14px rgba(255,55,95,0)}
+100%{box-shadow:0 0 0 0 rgba(255,55,95,0)}
+}
+.logo-wrap{
+width:92px;height:92px;margin:24px auto;
+border-radius:24px;background:rgba(255,255,255,.07);
+display:flex;align-items:center;justify-content:center;
+overflow:hidden;
+}
+.logo-wrap img{
+width:100%;height:100%;object-fit:contain;padding:10px;
+}
+.fallback{
+width:100%;height:100%;
+display:flex;align-items:center;justify-content:center;
+font-size:28px;font-weight:800;
+background:linear-gradient(135deg,#7c3aed,#06b6d4);
+}
+.channel-name{text-align:center;font-size:20px;font-weight:700}
+.meta{
+display:flex;justify-content:center;gap:10px;
+margin-top:12px;flex-wrap:wrap;
+}
+.tag{
+padding:8px 12px;border-radius:999px;
+background:rgba(255,255,255,.07);font-size:12px;
+}
+.country{text-align:center;margin-top:18px;color:#94a3b8}
+.player-modal{
+position:fixed;inset:0;background:rgba(0,0,0,.9);
+display:none;align-items:center;justify-content:center;
+padding:20px;z-index:999;
+}
+.player-modal.active{display:flex}
+.player{
+width:min(1100px,100%);
+background:#05070d;border-radius:28px;overflow:hidden;
+}
+.player-top{
+display:flex;justify-content:space-between;
+align-items:center;padding:18px 20px;
+}
+.close{
+width:46px;height:46px;border:none;border-radius:14px;
+background:rgba(255,255,255,.08);
+color:white;font-size:22px;cursor:pointer;
+}
+video{
+width:100%;height:70vh;background:black;
+}
+.error{
+padding:18px;text-align:center;color:#ff9db0;
+}
+@media(max-width:768px){
+.grid{grid-template-columns:1fr}
+video{height:50vh}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+<div class="hero">
+<div class="brand">
+<div class="logo">▶</div>
+<div>
+<h1>PulseTV</h1>
+<p>India • Bangladesh • Kids TV</p>
+</div>
+</div>
+
+<div class="search-wrap">
+<div class="search-icon">⌕</div>
+<input id="searchInput" class="search" placeholder="Search channels..." />
+</div>
+</div>
+
+<div class="filters">
+<div class="filter-row" id="categoryFilters"></div>
+</div>
+
+<div class="section">
+<h2>India • Bangladesh • Kids TV</h2>
+<div class="results" id="resultsText">Loading...</div>
+<div class="grid" id="grid"></div>
+</div>
+</div>
+
+<div class="player-modal" id="playerModal">
+<div class="player">
+<div class="player-top">
+<h3 id="playerTitle">Live TV</h3>
+<button class="close" id="closePlayer">✕</button>
+</div>
+
+<video id="video" controls autoplay playsinline></video>
+<div class="error" id="playerError"></div>
+</div>
+</div>
+
+<script>
+const API = {
+channels:'https://iptv-org.github.io/api/channels.json',
+streams:'https://iptv-org.github.io/api/streams.json',
+logos:'https://iptv-org.github.io/api/logos.json',
+categories:'https://iptv-org.github.io/api/categories.json',
+countries:'https://iptv-org.github.io/api/countries.json'
+};
+
+const ALLOWED_COUNTRIES=['IN','BD'];
+
+const KIDS_KEYWORDS=[
+'kids','children','cartoon','anime','family'
+];
+
+const grid=document.getElementById('grid');
+const categoryFilters=document.getElementById('categoryFilters');
+const resultsText=document.getElementById('resultsText');
+const searchInput=document.getElementById('searchInput');
+
+let allChannels=[];
+let filteredChannels=[];
+let selectedCategory='all';
+let hls;
+
+function getInitials(name){
+return name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+}
+
+function isKidsChannel(channel, categoryMap){
+const categoryNames=(channel.categories||[])
+.map(cat=>(categoryMap[cat]?.name||cat).toLowerCase());
+
+return categoryNames.some(cat=>
+KIDS_KEYWORDS.some(keyword=>cat.includes(keyword))
+);
+}
+
+function getStreamScore(stream){
+let score=0;
+const quality=stream.quality||'';
+
+if(quality.includes('1080')) score+=80;
+else if(quality.includes('720')) score+=70;
+else if(quality.includes('480')) score+=60;
+
+if(!stream.referrer) score+=20;
+if(stream.url.includes('.m3u8')) score+=40;
+
+return score;
+}
+
+async function loadData(){
+try{
+
+const [channelsRes,streamsRes,logosRes,categoriesRes,countriesRes]
+= await Promise.all([
+fetch(API.channels),
+fetch(API.streams),
+fetch(API.logos),
+fetch(API.categories),
+fetch(API.countries)
+]);
+
+const channels=await channelsRes.json();
+const streams=await streamsRes.json();
+const logos=await logosRes.json();
+const categories=await categoriesRes.json();
+const countries=await countriesRes.json();
+
+const streamMap={};
+const logoMap={};
+const categoryMap={};
+const countryMap={};
+
+categories.forEach(cat=>categoryMap[cat.id]=cat);
+countries.forEach(country=>countryMap[country.code]=country);
+
+streams.forEach(stream=>{
+if(!stream.channel||!stream.url) return;
+if(
+!stream.url.includes('.m3u8') &&
+!stream.url.includes('.mpd')
+) return;
+
+const existing=streamMap[stream.channel];
+const score=getStreamScore(stream);
+
+if(!existing||score>existing.score){
+streamMap[stream.channel]={...stream,score};
+}
+});
+
+logos.forEach(logo=>{
+if(!logo.channel||!logo.url) return;
+
+const existing=logoMap[logo.channel];
+const score=(logo.format==='SVG'?10:0)+(logo.width||0);
+
+if(!existing||score>existing.score){
+logoMap[logo.channel]={...logo,score};
+}
+});
+
+allChannels=channels
+.filter(channel=>{
+if(channel.is_nsfw) return false;
+
+const allowedCountry=ALLOWED_COUNTRIES.includes(channel.country);
+const kidsOnly=isKidsChannel(channel,categoryMap);
+
+return allowedCountry||kidsOnly;
+})
+.map(channel=>{
+
+const stream=streamMap[channel.id];
+if(!stream) return null;
+
+const logo=logoMap[channel.id];
+const country=countryMap[channel.country];
+const categoryId=channel.categories?.[0]||'general';
+
+return{
+...channel,
+stream,
+logo:logo?.url||null,
+categoryName:categoryMap[categoryId]?.name||categoryId,
+countryName:country?.name||channel.country,
+flag:country?.flag||'🌍'
+};
+})
+.filter(Boolean)
+.slice(0,1500);
+
+filteredChannels=allChannels;
+
+renderCategories();
+renderChannels();
+
+}catch(err){
+console.error(err);
+grid.innerHTML='<h2>Failed to load channels</h2>';
+}
+}
+
+
+function renderCategories(){
+
+categoryFilters.innerHTML='';
+
+const filters = [
+  {id:'all', label:'All'},
+  {id:'BD', label:'🇧🇩 Bangladesh'},
+  {id:'IN', label:'🇮🇳 India'},
+  {id:'kids', label:'👶 Kids'}
+];
+
+filters.forEach((item,index)=>{
+
+const chip=document.createElement('button');
+chip.className='chip' + (index===0 ? ' active' : '');
+chip.textContent=item.label;
+
+chip.onclick=()=>{
+
+selectedCategory=item.id;
+
+updateActiveChip(chip);
+
+applyFilters();
+
+};
+
+categoryFilters.appendChild(chip);
+
+});
+
+}
+
+function updateActiveChip(activeChip){
+document.querySelectorAll('.chip')
+.forEach(c=>c.classList.remove('active'));
+
+activeChip.classList.add('active');
+}
+
+
+function applyFilters(){
+
+const query=searchInput.value.toLowerCase();
+
+filteredChannels=allChannels.filter(channel=>{
+
+let matchesCategory=false;
+
+if(selectedCategory==='all'){
+matchesCategory=true;
+}
+else if(selectedCategory==='BD'){
+matchesCategory=channel.country==='BD';
+}
+else if(selectedCategory==='IN'){
+matchesCategory=channel.country==='IN';
+}
+else if(selectedCategory==='kids'){
+matchesCategory=
+(channel.categoryName||'')
+.toLowerCase()
+.includes('kids');
+}
+
+const matchesSearch=
+channel.name.toLowerCase().includes(query) ||
+channel.countryName.toLowerCase().includes(query);
+
+return matchesCategory && matchesSearch;
+
+});
+
+renderChannels();
+
+}
+
+
+function renderChannels(){
+resultsText.textContent=
+filteredChannels.length+' live channels';
+
+grid.innerHTML='';
+
+filteredChannels.forEach(channel=>{
+
+const card=document.createElement('div');
+card.className='card';
+
+card.innerHTML=`
+<div class="live">
+<div class="dot"></div>
+LIVE
+</div>
+
+<div class="logo-wrap">
+${channel.logo
+? `<img src="${channel.logo}" />`
+: `<div class="fallback">${getInitials(channel.name)}</div>`
+}
+</div>
+
+<div class="channel-name">${channel.name}</div>
+
+<div class="meta">
+<div class="tag">${channel.categoryName}</div>
+</div>
+
+<div class="country">
+${channel.flag} ${channel.countryName}
+</div>
+`;
+
+card.onclick=()=>openPlayer(channel);
+
+grid.appendChild(card);
+});
+}
+
+const playerModal=document.getElementById('playerModal');
+const video=document.getElementById('video');
+const playerTitle=document.getElementById('playerTitle');
+const playerError=document.getElementById('playerError');
+
+async function openPlayer(channel){
+
+playerModal.classList.add('active');
+
+playerTitle.textContent=channel.name;
+playerError.textContent='';
+
+const streamUrl=channel.stream.url;
+
+if(hls){
+hls.destroy();
+}
+
+video.pause();
+video.removeAttribute('src');
+video.load();
+
+if(Hls.isSupported()){
+
+hls=new Hls({
+enableWorker:true,
+lowLatencyMode:true,
+backBufferLength:90
+});
+
+hls.loadSource(streamUrl);
+hls.attachMedia(video);
+
+hls.on(Hls.Events.MANIFEST_PARSED,()=>{
+video.play().catch(()=>{});
+});
+
+hls.on(Hls.Events.ERROR,function(event,data){
+
+if(data.fatal){
+
+switch(data.type){
+
+case Hls.ErrorTypes.NETWORK_ERROR:
+hls.startLoad();
+break;
+
+case Hls.ErrorTypes.MEDIA_ERROR:
+hls.recoverMediaError();
+break;
+
+default:
+playerError.textContent='This stream is currently offline.';
+hls.destroy();
+break;
+}
+}
+});
+
+}else if(video.canPlayType('application/vnd.apple.mpegurl')){
+
+video.src=streamUrl;
+
+video.addEventListener('loadedmetadata',()=>{
+video.play();
+});
+
+}else{
+playerError.textContent='Your browser does not support HLS playback.';
+}
+}
+
+document.getElementById('closePlayer').onclick=()=>{
+playerModal.classList.remove('active');
+video.pause();
+if(hls) hls.destroy();
+};
+
+playerModal.onclick=e=>{
+if(e.target===playerModal){
+playerModal.classList.remove('active');
+video.pause();
+if(hls) hls.destroy();
+}
+};
+
+searchInput.addEventListener('input',applyFilters);
+
+loadData();
+</script>
+
+</body>
+</html>
